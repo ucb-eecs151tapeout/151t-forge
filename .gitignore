@@ -1,0 +1,12 @@
+.bsp
+.metals
+.scala-build
+.vscode
+.vscode
+.DS_Store
+generators/.bsp
+project/
+
+# pixi environments
+.pixi/*
+!.pixi/config.toml

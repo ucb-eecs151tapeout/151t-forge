@@ -1,0 +1,17 @@
+[workspace]
+authors = ["Jim Fang <yf328@berkeley.edu>"]
+channels = ["conda-forge", "ucb-bar"]
+name = "151t-forge"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.10,<3.15"
+riscv-tools = ">=1.0.7,<2"
+openjdk = { version = "17.*", channel = "conda-forge" }
+verilator = "==5.22"
+dtc = { version = ">=1.7.2,<2", channel = "conda-forge" }
+gcc = { version = "==14.1.0", channel = "conda-forge" }
+gxx = { version = "==14.1.0", channel = "conda-forge" }

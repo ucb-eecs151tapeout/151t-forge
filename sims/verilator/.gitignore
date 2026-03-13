@@ -1,0 +1,6 @@
+*
+!.gitignore
+!Makefile
+!verilator.mk
+!dramsim2_ini
+!.md
