@@ -9,4 +9,4 @@
 	url = git@github.com:riscv-software-src/riscv-pk.git
 [submodule "generators/riscv-sodor"]
 	path = generators/riscv-sodor
-	url = git@github.com:librecores/riscv-sodor.git
+	url = git@github.com:ucb-eecs151tapeout/riscv-sodor.git
