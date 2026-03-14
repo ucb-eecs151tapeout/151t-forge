@@ -288,7 +288,7 @@ make run-asm-tests
 
 Pass / fail summary and per-test logs are in the output directory. Normally you'd look for differences against expected golden (known correct) outputs to identify functional mismatches. Your output should look like:
 
-![Successful Run](docs/tests_passing.png) 
+![Successful Run]("docs/testspassing.png") 
 
 ## Getting waveforms for debugging
 
@@ -315,7 +315,7 @@ We will look more at waveforms later.
 
 # Known Problems
 
-Would you like to troubleshoot? :)
+Please let us know if you run into issues, any steps to debug them, and solutions! 
 
 * sodor uses a custom reset -- by writing to 0x44
    * https://github.com/riscv-software-src/riscv-isa-sim/blob/90a04da3f9235e17ab456b9263080f2dc32e4f1e/fesvr/dtm.cc 
@@ -327,7 +327,7 @@ Would you like to troubleshoot? :)
 
 * when run it creates a bunch of "rv32_2stage", "rv32_1stage" etc folders in `${forge}/generators/riscv-sodor/rv32_1stage`.. these shouldnt be made, its done somewhere in the makefile
 
-# Next Steps
+# Next Steps (WIP)
 
 We will release more instructions, but as this is a collaborative effort, we're very transparent about the directions as we define them, and welcome your own tackling of these and other problems! 
 
