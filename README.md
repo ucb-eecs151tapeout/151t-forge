@@ -180,7 +180,7 @@ This section walks you through building the RISC-V ISA simulator, the front-end 
 
 > FESVR is a C++ library that manages communication between a host machine and a RISC-V DUT. For debugging, it provides a simple API to reset, send messages, and load/run programs on a DUT. It also emulates peripheral devices. It can be incorporated with simulators (VCS, Verilator, FireSim), or used in a bringup sequence for a taped out chip.
 > 
-> ![Host Sim Communication Options](docs/image.png)
+> ![Host Sim Communication Options](docs/sim.png)
 
 - `riscv-tests` is the standard assembly test suite (RV32/RV64). We build and install it into the RISC-V target so the emulator and Spike can run the tests.
 
@@ -188,6 +188,8 @@ This section walks you through building the RISC-V ISA simulator, the front-end 
 
 
 ### Build Spike ISA Simulator
+
+**(1)**
 
 Enter the `riscv-isa-sim` tree and create a build directory: 
 
@@ -199,6 +201,8 @@ mkdir build
 cd build
 ```
 
+**(2)**
+
 Configure, build, and install:
 
 ```bash
@@ -208,6 +212,8 @@ make -j32
 
 make -j32 install
 ```
+
+**(3)**
 
 Verify `spike` resolves to the expected path (the Pixi environment’s riscv-tools binary): 
 
@@ -219,28 +225,52 @@ which spike # should resolve to ${forge}/.pixi/envs/default/riscv-tools/bin/spik
 
 For now, Forge uses an older, compatible FESVR fork. 
 
-Clone/build/install our forked FESVR at: [https://github.com/ucb-eecs151tapeout/riscv-fesvr-sodor](https://github.com/ucb-eecs151tapeout/riscv-fesvr-sodor)
+Clone/build/install our forked FESVR following instructions at: [https://github.com/ucb-eecs151tapeout/riscv-fesvr-sodor](https://github.com/ucb-eecs151tapeout/riscv-fesvr-sodor)
 
 It'll install it over the FESVR installed by `riscv-isa-sim` so the simulator and emulator use the correct FESVR version.
 
 ### Build and install RISC-V Tests
 
+**(1)**
+
+Enter the tests tree and ensure submodules are present, then generate autotools files and configure.
+
 ```bash
-
 cd ${forge}/tests/riscv-tests
-
-git submodule update --init --recursive
 
 autoconf
 
 ./configure --prefix=$RISCV/target
+```
 
+**(2)**
+
+Build and install the test suite (for RISC-V 32-bit): 
+
+```bash
 make -j32 XLEN=32 # XLEN=32 for rv32 isa tests only
 
 make -j32 install
 ```
 
-## running asm tests
+Installed test binaries will be placed under `$RISCV/target`. Now we want to build the Sodor Verilator simulator and run assembly tests.
+
+## Building the simulator
+
+We now compile the Sodor RTL into a cycle-accurate, host-executable simulator (using Verilator) and run the assembled RISC‑V tests against that simulator. This step verifies that the hardware RTL implements the ISA behavior expected by the test-suite and exposes functional bugs early in simulation before any physical-design work. Since we are using known-good cores and tests, everything should pass. However, you can write your own tests, and when you made modifications to the core, rerun everything to verify. The general steps are:
+
+- `make rtl`: Generates and prepares the Verilog from the Chisel/RTL sources and any required scaffolding so Verilator can compile the design.
+
+- `make emulator`: Invokes Verilator to compile the design into a C++/executable emulator and links the host-side test harness. The emulator models the Sodor core(s) and provides a bridge to run RISC‑V binaries.
+
+- `make run-asm-tests`: Runs the assembled test programs (from riscv-tests) on the emulator, compares expected outputs, and writes per-test logs. Passing these tests indicates the core’s functional behavior matches the ISA tests used in this lab.
+
+- `make emulator-debug` / `make run-asm-tests-debug`: Build and run a debug-enabled emulator that produces waveform (VCD/other) output. Waveforms let you inspect signal transitions and trace failures at the RTL level when tests fail
+
+### Running fast assembly tests 
+
+To do functional verification without waveform dump:
+
 ```bash
 cd ${forge}/sims/verilator
 
@@ -254,7 +284,16 @@ make run-asm-tests
 
 ```
 
-## waveforms
+**(1)** **Run this now and take a screenshot of the output. Do the tests pass?**
+
+Pass / fail summary and per-test logs are in the output directory. Normally you'd look for differences against expected golden (known correct) outputs to identify functional mismatches. Your output should look like:
+
+![Successful Run](docs/tests_passing.png) 
+
+## Getting waveforms for debugging
+
+To debug with waveforms enabled - which leads to larger builds and slower simulation: 
+
 ```bash
 cd ${forge}/sims/verilator
 
@@ -266,21 +305,34 @@ make run-asm-tests-debug
 
 # waveforms in ${forge}/sims/verilator/output
 
-
-i've attached a image of what setup successfully should look like (asm tests pass on any of the 1-5 stage sodor cores)
-
 ```
 
-# problems
+Waveforms (such as VCD) let you trace signals (fetch/decode/execute stages, register file updates, memory accesses..) to diagnose which pipeline stage or control signal caused a failure.
+
+**(1)** **Generate a waveform.**
+
+We will look more at waveforms later.
+
+# Known Problems
+
+Would you like to troubleshoot? :)
+
 * sodor uses a custom reset -- by writing to 0x44
    * https://github.com/riscv-software-src/riscv-isa-sim/blob/90a04da3f9235e17ab456b9263080f2dc32e4f1e/fesvr/dtm.cc 
    * this should get updated so that sodor supports resuming execution from `0x7b1` (dpc) [spec compliant] after coming out of debug mode.
 
+
 * cannot build riscv bmark test in rv32 due to ucb-bar riscv toolchain (feedstock) not supporting multi-lib - https://github.com/ucb-bar/riscv-tools-feedstock/pull/8 and the lack of a rv32 toolchain thats been compiled from source (cs152 has one, but ideally we don't depend on that, and we build from scratch)
+
 
 * when run it creates a bunch of "rv32_2stage", "rv32_1stage" etc folders in `${forge}/generators/riscv-sodor/rv32_1stage`.. these shouldnt be made, its done somewhere in the makefile
 
-# things that need to be done before tapeout
+# Next Steps
+
+We will release more instructions, but as this is a collaborative effort, we're very transparent about the directions as we define them, and welcome your own tackling of these and other problems! 
+
+Things that need to be done before tapeout:
+
 * jtag TAP to DMI unit - https://chipyard.readthedocs.io/en/stable/Advanced-Concepts/Chip-Communication.html
 * replace 3 stage's 1 cycle mem w/ srams
 * IO
@@ -288,10 +340,4 @@ i've attached a image of what setup successfully should look like (asm tests pas
 * whats the modern version of chisel-iotesters? move to that
 * figure out the custom reset/custom fesvr (to write to 0x44 to start exec) situation, and whether its even viable to keep that around?? (will we successfully bringup if its like that)
 
-
-
-
-# random
-https://fires.im/micro19-slides-pdf/02_chipyard_basics.pdf
-
-This lab establishes the foundation: you learn where the RTL comes from (Chisel elaboration), how the pipeline and memory/CSR interfaces are structured, and how to correlate the design with the generated SystemVerilog. Without that familiarity, debugging the RTL, integrating peripherals, and interpreting PD/simulation results would be much harder. Treat this as the “get to know the core" step before verification and tapeout.
+We would like to also establish the foundation: you learn where the RTL comes from (Chisel elaboration), how the pipeline and memory/CSR interfaces are structured, and how to correlate the design with the generated SystemVerilog. Without that familiarity, debugging the RTL, integrating peripherals, and interpreting PD/simulation results would be much harder. Treat this as the “get to know the core" step before verification and tapeout.
