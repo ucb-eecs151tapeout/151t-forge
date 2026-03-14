@@ -159,34 +159,64 @@ Glance at the following for quality of life improvements:
 
 - Documentation on Pixi shell integration and how to enable shell completions (helps with activation, command completion, and nicer interactive use): https://pixi.prefix.dev/latest/advanced/pixi_shell/#shell-completions
 
+**(3)** **Initiate submodules.** 
 
-## Build Setup
+Initialize all repository submodules with:
 
 ```
-cd riscv-sodor
+cd 151t-forge
 git submodule update --init --recursive
 ```
 
+Ensure all submodules (e.g., riscv-sodor, riscv-tests) initialize without errors. 
 
-### spike
+## Build setup - run simulations and assembly tests
+
+This section walks you through building the RISC-V ISA simulator, the front-end server, the RISC‑V test suite, and running the Sodor Verilator simulations and assembly tests. Do these steps from your instructional machine (in a tmux session) after your Pixi environment and repo submodules are initialized. To summarize:
+
+- [Spike](https://github.com/riscv-software-src/riscv-isa-sim) (`riscv-isa-sim`) provides a Golden RISC‑V ISA simulator used as a reference and to run tests. We build a local copy so the FESVR and tools used by Forge point to the repository-local install (and so Spike resolves to the Pixi-managed toolchain path).
+
+- [FESVR](https://chipyard.readthedocs.io/en/latest/Advanced-Concepts/Chip-Communication.html) (front-end server) provides the interface used by many simulators to talk to simulated RISC‑V cores. Forge uses a specific FESVR fork compatible with the Sodor setup.
+
+> FESVR is a C++ library that manages communication between a host machine and a RISC-V DUT. For debugging, it provides a simple API to reset, send messages, and load/run programs on a DUT. It also emulates peripheral devices. It can be incorporated with simulators (VCS, Verilator, FireSim), or used in a bringup sequence for a taped out chip.
+> 
+> ![Host Sim Communication Options](docs/image.png)
+
+- `riscv-tests` is the standard assembly test suite (RV32/RV64). We build and install it into the RISC-V target so the emulator and Spike can run the tests.
+
+- The Verilator-based simulator in `sims/verilator` compiles the Sodor RTL into an emulator, runs the assembled tests, and writes logs and (optionally) waveform VCD files.
+
+
+### Build Spike ISA Simulator
+
+Enter the `riscv-isa-sim` tree and create a build directory: 
+
 ```bash
 cd ${forge}/tools/riscv-isa-sim
 
 mkdir build
 
 cd build
+```
 
+Configure, build, and install:
+
+```bash
 ../configure --prefix=$RISCV
 
 make -j32
 
 make -j32 install
-
-which spike # should resolve to ${forge}/.pixi/envs/default/riscv-tools/bin/spike
-
 ```
 
-### fesvr
+Verify `spike` resolves to the expected path (the Pixi environment’s riscv-tools binary): 
+
+```bash
+which spike # should resolve to ${forge}/.pixi/envs/default/riscv-tools/bin/spike
+```
+
+### Install FESVR
+
 * we are on an older version of fesvr... install here: https://github.com/ucb-eecs151tapeout/riscv-fesvr-sodor
    * it'll install on top of the fesvr installed by the riscv-isa-sim (spike) dir
 
