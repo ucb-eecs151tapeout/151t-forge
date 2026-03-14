@@ -288,7 +288,7 @@ make run-asm-tests
 
 Pass / fail summary and per-test logs are in the output directory. Normally you'd look for differences against expected golden (known correct) outputs to identify functional mismatches. Your output should look like:
 
-![Successful Run]("docs/testspassing.png") 
+![Successful Run](docs/testspassing.png)
 
 ## Getting waveforms for debugging
 
