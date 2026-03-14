@@ -1,4 +1,22 @@
-# 151t forge
+# Lab 2: "151T Forge" Sodor Repository Setup
+
+## Introduction
+
+In lecture sessions, we talked about Chipyard, Rocket Chip, various RISC-V cores, etc.. And in Lab 1, you learned Chisel. We are now going to use Chisel and System Verilog to setup an SoC repository for the 151T tapeout called "151T Forge". 
+
+Forge is going to be a teaching version of the integrated SoC development platform [Chipyard](https://github.com/ucb-bar/chipyard). This is a Spring 2026 experiment driven by feedback to integrate System Verilog usage, remove dependency on Chipyard (which some find quite complex), and integrate IP from scratch. 
+
+Since this is an experiment, you are encouraged to explore your own ideas, provide feedback, submit Github pull requests, and document errors on the Discord. Everybody will work together on the same repository, creating branches and pull requests as described in Lab 0. Do NOT force push to the main branch even if settings do not prevent you from it. 
+
+The [Sodor project](https://github.com/ucb-bar/riscv-sodor?tab=readme-ov-file) provides multiple pipelined implementations (1-, 2-, 3-, 5-stage, and microcoded) of a RISC-V core written in Chisel. You can choose any of the 1-5 stage cores to start.
+
+As the Lab 2 deliverable, you will run through the repository setup. Then you will run existing assembly (RISC-V) tests on the Sodor core. Your submisison is the core passing all tests. Staff will work in parallel to provide guidance for the follow-up tasks, currently listed as "next steps," but you're welcome to jump ahead. 
+
+Later you will add peripherals, run verification, and take the Sodor RTL through physical-design (PD) flows in Sky130 to tapeout.
+
+
+## Pixi
+
 
 https://pixi.prefix.dev/latest/installation/
 
@@ -73,6 +91,9 @@ make emulator-debug
 make run-asm-tests-debug
 
 # waveforms in ${forge}/sims/verilator/output
+
+
+i've attached a image of what setup successfully should look like (asm tests pass on any of the 1-5 stage sodor cores)
 
 ```
 
