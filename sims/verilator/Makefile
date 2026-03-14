@@ -1,123 +1,260 @@
-#
-# RISCV-SODOR Verilator Makefile
-#
+all: emulator
 
-# --- Boilerplate ---
-SHELL := /bin/bash
-.SHELLFLAGS += -o pipefail -c
-.SUFFIXES:
-.PHONY: default all verilog fesvr sim run clean
-.DEFAULT_GOAL := all
+RISCV           ?= /opt/riscv  # prioritize $RISCV env variable
+srcDir          := $(abspath ../../generators/riscv-sodor)
+fesvrDir        := $(abspath ../../tools/riscv-fesvr)
+buildLibDir     := $(RISCV)/lib
+buildDir        := $(abspath ./build)
 
-# --- Path Setup ---
-sim_dir  := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
-base_dir := $(abspath $(sim_dir)/../..)
+CXX := g++
+SBT := sbt $(SBT_FLAGS)
 
-sodor_dir         := $(base_dir)/generators/riscv-sodor
-vsrc_dir          := $(sodor_dir)/vsrc
-riscv_isa_sim_dir := $(base_dir)/tools/riscv-isa-sim
-common_sim_dir    := $(sodor_dir)/emulator/common
+.PHONY: all rtl clean
 
-build_root_dir    := $(sim_dir)/build
-output_root_dir   := $(sim_dir)/output
+# common  := $(srcDir)/sim
+# install     := $(srcDir)/install
 
-# --- User-configurable Variables ---
+# ELF         := elf2hex
+
+# pipe processor output through the spike-dasm program to turn 
+# raw instruction bits into pretty, readable diassembly
+disasm_exe := 2>
+which_disasm := $(shell which spike-dasm)
+ifneq ($(which_disasm),)
+	disasm_exe := 3>&1 1>&2 2>&3 | $(which_disasm) $(DISASM_EXTENSION) >
+endif
+
 MK_TARGET_PROC ?= rv32_1stage
-BINARY         ?=
-MAX_CYCLES     ?= 1000000
-VERILATOR_THREADS ?= 1
-RANDOM_SEED    ?=
-MODEL          ?= Top
 
-# --- Toolchain ---
-SBT       ?= sbt
-CXX       ?= g++
-VERILATOR ?= verilator
-LDFLAGS   ?=
 
-# --- Derived Variables ---
-core_build_dir    := $(build_root_dir)/$(MK_TARGET_PROC)
-output_dir        := $(output_root_dir)/$(MK_TARGET_PROC)
-sim_exe           := $(sim_dir)/simulator-$(MK_TARGET_PROC)
+generated_dir = $(buildDir)/generated-src/${MK_TARGET_PROC}
 
-TOP_V             := $(core_build_dir)/generated-src/Top.v
-verilog_stamp     := $(core_build_dir)/generated-src/.stamp
+rtl: $(generated_dir)/Top.v
+ 
+# ifneq ($(shell which pkg-config),)
+# 	ifneq ($(shell pkg-config --variable=includedir verilator),)
+# 		VERILATOR_INCLUDE=$(shell pkg-config --variable=includedir verilator)
+# 	else
+# 		ifneq ($(wildcard $(VERILATOR_ROOT)/include/vltstd/vpi_user.h),)
+# 			VERILATOR_INCLUDE=$(VERILATOR_ROOT)/include/
+# 		else
+# 			$(error VERILATOR_ROOT is set to $(VERILATOR_ROOT) but not finding expected_file in there.)
+# 		endif
+# 	endif
+# else
+# 	ifneq ($(wildcard $(VERILATOR_ROOT)/include/vltstd/vpi_user.h),)
+# 		VERILATOR_INCLUDE=$(VERILATOR_ROOT)/include/
+# 	else
+# 		$(error VERILATOR_ROOT is set to $(VERILATOR_ROOT) but not finding expected_file in there.)
+# 	endif
+# endif
 
-fesvr_build_dir   := $(core_build_dir)/fesvr
-libfesvr          := $(fesvr_build_dir)/lib/libfesvr.a
-
-verilator_obj_dir := $(core_build_dir)/verilator_obj_dir
-
-# --- Build Targets ---
-all: $(sim_exe)
-sim: $(sim_exe)
-
-# 1. Chisel: Elaborate Verilog
-verilog: $(TOP_V)
-$(TOP_V): $(verilog_stamp)
-	@# Phony dependency to ensure Verilog is generated.
-$(verilog_stamp): $(wildcard $(sodor_dir)/src/common/*.scala) $(wildcard $(sodor_dir)/src/$(MK_TARGET_PROC)/*.scala) $(sodor_dir)/build.sbt
-	@echo "Elaborating $(MK_TARGET_PROC) Verilog..."
-	mkdir -p $(dir $@)
-	cd $(sodor_dir) && $(SBT) "project $(MK_TARGET_PROC)" "run -td $(abspath $(dir $@))"
-	touch $@
-
-# 2. FESVR library
-fesvr: $(libfesvr)
-$(fesvr_build_dir)/Makefile: $(riscv_isa_sim_dir)/configure
-	mkdir -p $(fesvr_build_dir)
-	cd $(fesvr_build_dir) && $(riscv_isa_sim_dir)/configure --prefix=$(fesvr_build_dir)
-$(libfesvr): $(fesvr_build_dir)/Makefile
-	@echo "Building and installing FESVR..."
-	$(MAKE) -C $(fesvr_build_dir)
-	$(MAKE) -C $(fesvr_build_dir) install
-
-# 3. Verilator Build
-VERILATOR_INCLUDE := $(shell pkg-config --variable=includedir verilator 2>/dev/null)
-ifeq ($(VERILATOR_INCLUDE),)
-ifeq ($(VERILATOR_ROOT),)
-$(error VERILATOR_ROOT is not set and pkg-config could not find verilator)
-endif
-VERILATOR_INCLUDE := $(VERILATOR_ROOT)/include
+ifneq ($(shell which pkg-config 2>/dev/null),)
+VERILATOR_CFLAGS := $(shell pkg-config --cflags verilator 2>/dev/null)
 endif
 
-VLT_CFLAGS := -I$(common_sim_dir) -I$(riscv_isa_sim_dir) -I$(fesvr_build_dir)/include -I$(VERILATOR_INCLUDE) -DVERILATOR -include $(common_sim_dir)/verilator.h
+ifeq ($(strip $(VERILATOR_CFLAGS)),)
+ifeq ($(strip $(VERILATOR_ROOT)),)
+VERILATOR_ROOT := $(shell verilator -V 2>/dev/null | sed -n 's/^VERILATOR_ROOT *= *//p')
+endif
+
+ifneq ($(wildcard $(VERILATOR_ROOT)/include/vltstd/vpi_user.h),)
+VERILATOR_CFLAGS := -I$(VERILATOR_ROOT)/include -I$(VERILATOR_ROOT)/include/vltstd
+else
+$(error Could not find Verilator headers. Set VERILATOR_ROOT or make pkg-config verilator work.)
+endif
+endif
+ 
 CXXFLAGS += -O1 -std=c++17 -g
 
-VLT_LDFLAGS := "$(LDFLAGS) -L$(fesvr_build_dir)/lib -lfesvr -lpthread -ldl -lfdt"
-VLT_OPTS = \
-	--cc --exe --main \
-	-O3 --x-assign 0 --x-initial 0 \
-	-Wall -Wno-fatal --assert \
-	--threads $(VERILATOR_THREADS) --threads-dpi all \
-	+define+PRINTF_COND=1 +define+VERILATOR \
-	--top-module $(MODEL) \
-	-I$(vsrc_dir) \
-	-CFLAGS '$(VLT_CFLAGS)' \
-	-LDFLAGS '$(VLT_LDFLAGS)' \
-	-o $(sim_exe)
+CXXSRCS := SimDTM
+CXXFLAGS += -I$(srcDir)/sim -I$(fesvrDir)
+CXXFLAGS += $(VERILATOR_CFLAGS)
+CXXDEBUGFLAGS := -DDEBUG
 
-VLT_VSRCS = $(TOP_V) $(vsrc_dir)/SimDTM.v $(vsrc_dir)/AsyncReadMem.sv $(vsrc_dir)/SyncMem.sv
-VLT_CPPSRCS = $(common_sim_dir)/emulator.cpp $(common_sim_dir)/SimDTM.cc
+LDFLAGS := $(LDFLAGS) -L$(buildLibDir) -Wl,-rpath,$(buildLibDir) -L. -lpthread
+# OBJS := $(addsuffix .o,$(CXXSRCS))
+OBJS := $(addprefix $(buildDir)/,$(addsuffix .o,$(CXXSRCS)))
+# DEBUG_OBJS := $(addsuffix -debug.o,$(CXXSRCS))
+DEBUG_OBJS := $(addprefix $(buildDir)/,$(addsuffix -debug.o,$(CXXSRCS)))
 
-verilator_model_mk := $(verilator_obj_dir)/V$(MODEL).mk
-$(verilator_model_mk): $(TOP_V) $(libfesvr)
-	@echo "Verilating $(MK_TARGET_PROC)..."
-	$(VERILATOR) $(VLT_OPTS) $(VLT_VSRCS) $(VLT_CPPSRCS) --Mdir $(verilator_obj_dir)
+CHISEL_ARGS := -td emulator/${MK_TARGET_PROC}/generated-src
+CHISEL_ARGS_DEBUG := 
 
-$(sim_exe): $(verilator_model_mk)
-	@echo "Building simulator executable..."
-	$(MAKE) -C $(verilator_obj_dir) -f V$(MODEL).mk
+# To find emulator.cpp
+vpath %.cpp  $(srcDir)/sim
+vpath %.cc 	$(fesvrDir)/fesvr $(srcDir)/sim
+vpath %.h 	$(fesvrDir)/fesvr $(srcDir)/sim
+vpath %.a    $(buildLibDir) 
+vpath %.v 	$(srcDir)/vsrc
+vpath %.sv 	$(srcDir)/vsrc
 
-# --- Run Targets ---
-run: $(sim_exe)
-	@if [ -z "$(BINARY)" ]; then 
-		echo "ERROR: Must specify a binary to run with BINARY="; exit 1; 
-	fi
-	mkdir -p $(output_dir)
-	@echo "Running $(BINARY) on $(MK_TARGET_PROC) simulator..."
-	$(sim_exe) +max-cycles=$(MAX_CYCLES) $(BINARY) 2>&1 | tee $(output_dir)/$(notdir $(BINARY)).log
+# build/generated-src/Top.v: $(srcDir)/src/${MK_TARGET_PROC}/*.scala $(srcDir)/src/common/*.scala
+# 	cd $(buildDir) && $(SBT) "project ${MK_TARGET_PROC}" "run $(CHISEL_ARGS)"
 
-# --- Clean Targets ---
+# generated-src/Top.v: \
+#   $(wildcard $(srcDir)/src/common/*.scala) \
+#   $(wildcard $(srcDir)/src/$(MK_TARGET_PROC)/*.scala)
+# 	mkdir -p $(buildDir) && cd $(buildDir) && $(SBT) "project $(MK_TARGET_PROC)" "run $(CHISEL_ARGS)"
+
+$(generated_dir)/Top.v: \
+  $(wildcard $(srcDir)/src/common/*.scala) \
+  $(wildcard $(srcDir)/src/$(MK_TARGET_PROC)/*.scala)
+	mkdir -p $(buildDir)/generated-src/$(MK_TARGET_PROC)
+	cd $(srcDir) && $(SBT) "project $(MK_TARGET_PROC)" "run --target-dir $(buildDir)/generated-src/$(MK_TARGET_PROC)"
+
+# $(addsuffix .o,$(CXXSRCS)): %.o: $(srcDir)/sim/%.cc
+# 	$(CXX) $(CXXFLAGS) -I${VERILATOR_INCLUDE} -c -o $@ $<
+
+# $(buildDir)/%.o: $(srcDir)/sim/%.cc
+# 	mkdir -p $(buildDir)
+# 	$(CXX) $(CXXFLAGS) -I$(VERILATOR_INCLUDE) -c -o $@ $<
+
+$(buildDir)/%.o: $(srcDir)/sim/%.cc
+	mkdir -p $(buildDir)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+# Run Verilator to produce a fast binary to emulate this circuit.
+VERILATOR := verilator --cc --exe --timing
+VERILATOR_FLAGS := --top-module Top \
+  +define+PRINTF_COND=\$$c\(\"verbose\"\) \
+  --assert \
+  --output-split 20000 \
+	--x-assign unique \
+  -I$(srcDir)/vsrc \
+  -Mdir $(buildDir)/obj_dir \
+  -O3 -CFLAGS "$(CXXFLAGS) $(LDFLAGS) -DVERILATOR -include $(srcDir)/sim/verilator.h"
+emulator: $(generated_dir)/Top.v $(srcDir)/sim/emulator.cpp $(buildDir)/SimDTM.o $(srcDir)/vsrc/AsyncReadMem.sv $(srcDir)/vsrc/SyncMem.sv $(srcDir)/vsrc/SimDTM.v
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+	-o $(buildDir)/$@ $< $(srcDir)/vsrc/SimDTM.v -LDFLAGS "$(LDFLAGS)" $(srcDir)/sim/emulator.cpp $(fesvrDir)/build/libfesvr.so $(buildDir)/SimDTM.o
+	$(MAKE) -C $(buildDir)/obj_dir -f VTop.mk
+
+emulator-debug: $(generated_dir)/Top.v $(srcDir)/sim/emulator.cpp $(buildDir)/SimDTM.o $(srcDir)/vsrc/AsyncReadMem.sv $(srcDir)/vsrc/SyncMem.sv $(srcDir)/vsrc/SimDTM.v
+	$(VERILATOR) $(VERILATOR_FLAGS) --trace \
+	-o $(buildDir)/$@ $< $(srcDir)/vsrc/SimDTM.v -LDFLAGS "$(LDFLAGS)" $(srcDir)/sim/emulator.cpp $(fesvrDir)/build/libfesvr.so $(buildDir)/SimDTM.o
+	$(MAKE) -C $(buildDir)/obj_dir -f VTop.mk
+ 
 clean:
-	rm -rf $(build_root_dir) $(output_root_dir) $(sim_dir)/simulator-*
+	rm -rf $(buildDir)/obj_dir
+	rm -rf $(buildDir)/*.o
+	rm -rf $(buildDir)/emulator*
+	rm -rf output
+
+distclean:
+	rm -rf $(buildDir)
+	rm -rf output
+	rm -rf SimDTM.o
+
+#--------------------------------------------------------------------
+# Tests
+#--------------------------------------------------------------------
+
+# Globally installed assembly tests
+global_tstdir = $(RISCV)/target/share/riscv-tests/isa
+
+global_asm_tests += \
+	rv32ui-p-simple \
+	rv32ui-p-add \
+	rv32ui-p-addi \
+	rv32ui-p-auipc \
+	rv32ui-p-fence_i \
+	rv32ui-p-sb \
+	rv32ui-p-sh \
+	rv32ui-p-sw \
+	rv32ui-p-and \
+	rv32ui-p-andi \
+	rv32ui-p-beq \
+	rv32ui-p-bge \
+	rv32ui-p-bgeu \
+	rv32ui-p-blt \
+	rv32ui-p-bltu \
+	rv32ui-p-bne \
+	rv32ui-p-jal \
+	rv32ui-p-jalr \
+	rv32ui-p-lb \
+	rv32ui-p-lbu \
+	rv32ui-p-lh \
+	rv32ui-p-lhu \
+	rv32ui-p-lui \
+	rv32ui-p-lw \
+	rv32ui-p-or \
+	rv32ui-p-ori \
+	rv32ui-p-sll \
+	rv32ui-p-slli \
+	rv32ui-p-slt \
+	rv32ui-p-slti \
+	rv32ui-p-sra \
+	rv32ui-p-srai \
+	rv32ui-p-sub \
+	rv32ui-p-xor \
+	rv32ui-p-xori \
+	rv32mi-p-sbreak \
+	rv32mi-p-scall \
+	rv32mi-p-ma_fetch \
+	rv32mi-p-ma_addr \
+	rv32mi-p-csr \
+	rv32mi-p-illegal \
+
+# Globally installed benchmarks
+global_bmarkdir = $(RISCV)/target/share/riscv-tests/benchmarks
+global_bmarks = \
+	median \
+	multiply \
+	qsort \
+	rsort \
+	towers \
+	vvadd \
+	dhrystone
+
+#--------------------------------------------------------------------
+# Run assembly tests and benchmarks
+#--------------------------------------------------------------------
+global_asm_out = $(addsuffix .out, $(global_asm_tests))
+global_asm_vcd = $(addsuffix .vcd, $(global_asm_tests))
+    
+global_bmarks_out = $(addsuffix .riscv.out, $(global_bmarks))
+global_bmarks_vcd = $(addsuffix .riscv.vcd, $(global_bmarks))
+global_bmarks_outgz = $(addsuffix .riscv.out.gz, $(global_bmarks))
+
+asm_test_timeout ?=30000
+bmark_timeout ?=1000000
+                           
+output:
+	mkdir -p $@
+
+$(addprefix output/, $(global_asm_vcd)): output/%.vcd: $(global_tstdir)/% emulator-debug
+	mkdir -p output
+	$(buildDir)/emulator-debug -v$@ +max-cycles=$(asm_test_timeout) +verbose +loadmem=$< 2> /dev/null
+
+$(addprefix output/, $(global_asm_out)): output/%.out: $(global_tstdir)/% emulator
+	mkdir -p output
+	$(buildDir)/emulator +max-cycles=$(asm_test_timeout) +verbose +loadmem=$< none $(disasm_exe) $@
+
+$(addprefix output/, $(global_bmarks_out)): output/%.riscv.out: $(global_bmarkdir)/%.riscv emulator
+	mkdir -p output
+	$(buildDir)/emulator +max-cycles=$(bmark_timeout) +verbose +loadmem=$< none $(disasm_exe) $@
+	
+$(addprefix output/, $(global_bmarks_vcd)): output/%.riscv.vcd: $(global_bmarkdir)/%.riscv emulator-debug
+	mkdir -p output
+	$(buildDir)/emulator-debug -v$@ +max-cycles=$(bmark_timeout) +verbose +loadmem=$< 2> /dev/null
+
+run-asm-tests: $(addprefix output/, $(addsuffix .out, $(global_asm_tests)))
+	@echo; perl -ne 'print "  [$$1] $$ARGV \t$$2\n" if /\*{3}(.{8})\*{3}(.*)/' $^; echo;
+
+run-bmarks-test: $(addprefix output/, $(addsuffix .riscv.out, $(global_bmarks)))
+	-@echo; perl -ne 'print "  [$$1] $$ARGV \t$$2\n" if /\*{3}(.{8})\*{3}(.*)/' $^; echo;
+
+run-asm-tests-debug: $(addprefix output/, $(addsuffix .vcd, $(global_asm_tests)))
+	@echo
+	@printf '%s\n' $^ | sed 's#^#  [ PASSED ] #' 
+	@echo
+
+run-bmarks-test-debug: $(addprefix output/, $(addsuffix .riscv.vcd, $(global_bmarks)))
+	@echo
+	@printf '%s\n' $^ | sed 's#^#  [ PASSED ] #'
+	@echo
+
+run: run-asm-tests run-bmarks-test
+run-debug: run-asm-tests-debug run-bmarks-test-debug
+run-fast: $(addprefix output/, $(addsuffix .run, $(global_asm_tests) $(global_bmarks)))
+

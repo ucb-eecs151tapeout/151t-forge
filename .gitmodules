@@ -10,3 +10,6 @@
 [submodule "generators/riscv-sodor"]
 	path = generators/riscv-sodor
 	url = git@github.com:ucb-eecs151tapeout/riscv-sodor.git
+[submodule "tools/riscv-fesvr"]
+	path = tools/riscv-fesvr
+	url = git@github.com:ucb-eecs151tapeout/riscv-fesvr-sodor.git

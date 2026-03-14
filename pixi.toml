@@ -10,8 +10,9 @@ version = "0.1.0"
 [dependencies]
 python = ">=3.10,<3.15"
 riscv-tools = ">=1.0.7,<2"
-openjdk = { version = "17.*", channel = "conda-forge" }
+openjdk = { version = "==8.0.472", channel = "conda-forge" }
 verilator = "==5.22"
 dtc = { version = ">=1.7.2,<2", channel = "conda-forge" }
 gcc = { version = "==14.1.0", channel = "conda-forge" }
 gxx = { version = "==14.1.0", channel = "conda-forge" }
+sbt = { version = ">=1.12.4,<2", channel = "conda-forge" }
