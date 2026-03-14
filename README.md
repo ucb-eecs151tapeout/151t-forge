@@ -14,15 +14,26 @@ As the Lab 2 deliverable, you will run through the repository setup. Then you wi
 
 Later you will add peripherals, run verification, and take the Sodor RTL through physical-design (PD) flows in Sky130 to tapeout.
 
+## Package management and environment setup
 
-## Pixi
+When doing SoC design or any sort of project with complicated, intricate subcomponents, it helps to have a reproducible environment with the toolchain and dependencies installed. In other classes and projects, you might've used Conda or Miniforge. 
 
+- **Conda** is a full-featured, Python-based package and environment manager (large installer, broad features, slower installs; supports multiple channels including Anaconda).
+  
+- **Miniforge** is a minimal Conda-compatible installer that provides a lightweight Conda runtime and common channels (smaller footprint than full Anaconda; you still use `conda` as the command line interface (CLI)). 
+  
+- **Pixi** is a Rust-based, system-level package manager that builds on the Conda ecosystem/format for faster, safer, and more reproducible installs and better shell integration while remaining compatible with Conda packages.
 
-https://pixi.prefix.dev/latest/installation/
+We will use Pixi for this project as it works for Linux, MacOS, and Windows, while remaining fast and simple. Run Pixi to install the environment or packages defined by the repository (installs dependencies listed in the project config from within the 151t-forge directory) with:
 
 `$151t-forge/ pixi install`
 
-https://pixi.prefix.dev/latest/advanced/pixi_shell/#shell-completions
+Glance at the following for quality of life improvements:
+
+- Installation guide: https://pixi.prefix.dev/latest/installation/
+
+- Documentation on Pixi shell integration and how to enable shell completions (helps with activation, command completion, and nicer interactive use): https://pixi.prefix.dev/latest/advanced/pixi_shell/#shell-completions
+
 
 # build
 
@@ -119,3 +130,5 @@ i've attached a image of what setup successfully should look like (asm tests pas
 
 # random
 https://fires.im/micro19-slides-pdf/02_chipyard_basics.pdf
+
+This lab establishes the foundation: you learn where the RTL comes from (Chisel elaboration), how the pipeline and memory/CSR interfaces are structured, and how to correlate the design with the generated SystemVerilog. Without that familiarity, debugging the RTL, integrating peripherals, and interpreting PD/simulation results would be much harder. Treat this as the “get to know the core" step before verification and tapeout.
