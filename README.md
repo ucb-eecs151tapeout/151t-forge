@@ -170,7 +170,7 @@ git submodule update --init --recursive
 
 Ensure all submodules (e.g., riscv-sodor, riscv-tests) initialize without errors. 
 
-## Build setup - run simulations and assembly tests
+## Build setup for simulations and assembly tests
 
 This section walks you through building the RISC-V ISA simulator, the front-end server, the RISC‑V test suite, and running the Sodor Verilator simulations and assembly tests. Do these steps from your instructional machine (in a tmux session) after your Pixi environment and repo submodules are initialized. To summarize:
 
@@ -217,11 +217,14 @@ which spike # should resolve to ${forge}/.pixi/envs/default/riscv-tools/bin/spik
 
 ### Install FESVR
 
-* we are on an older version of fesvr... install here: https://github.com/ucb-eecs151tapeout/riscv-fesvr-sodor
-   * it'll install on top of the fesvr installed by the riscv-isa-sim (spike) dir
+For now, Forge uses an older, compatible FESVR fork. 
 
+Clone/build/install our forked FESVR at: [https://github.com/ucb-eecs151tapeout/riscv-fesvr-sodor](https://github.com/ucb-eecs151tapeout/riscv-fesvr-sodor)
 
-## riscv tests
+It'll install it over the FESVR installed by `riscv-isa-sim` so the simulator and emulator use the correct FESVR version.
+
+### Build and install RISC-V Tests
+
 ```bash
 
 cd ${forge}/tests/riscv-tests
